@@ -9,12 +9,101 @@
     "primary": "#2e8555",
     "light": "#49cc90",
     "dark": "#2e8555",
-    "anchors": { "from": "#2e8555", "to": "#49cc90" }
+    "anchors": {
+      "from": "#2e8555",
+      "to": "#49cc90"
+    }
   },
+  "topbarLinks": [
+    { "name": "Test Console", "url": "/test" },
+    { "name": "Partner Console", "url": "/partners" }
+  ],
+  "topbarCtaButton": { "name": "Get Started", "url": "/quickstart/platform" },
+  "tabs": [
+    { "name": "API Reference", "url": "api-reference" }
+  ],
+  "anchors": [
+    { "name": "GitHub", "icon": "github", "url": "https://github.com/partner-funded-credits" },
+    { "name": "Test Console", "icon": "terminal", "url": "/test" }
+  ],
   "navigation": [
     {
       "group": "Get Started",
-      "pages": [ "" ]
+      "pages": [
+        "/",
+        "overview",
+        "quickstart/platform",
+        "quickstart/partner"
+      ]
+    },
+    {
+      "group": "Guides",
+      "pages": [
+        "guides/projects-auth",
+        "guides/integration-verification",
+        "guides/credits-wallets",
+        "guides/rules-engine",
+        "guides/event-gated-bonus",
+        "guides/match-spend-vouchers",
+        "guides/billing-budgets",
+        "guides/security-model",
+        "guides/observability"
+      ]
+    },
+    {
+      "group": "Reference",
+      "pages": [
+        "troubleshooting",
+        "changelog"
+      ]
+    },
+    {
+      "group": "API Documentation",
+      "pages": [
+        "api-reference/overview",
+        "api-reference/authentication"
+      ]
+    },
+    {
+      "group": "System",
+      "pages": [ "api-reference/system/debug" ]
+    },
+    {
+      "group": "Projects",
+      "pages": [ "api-reference/projects/create" ]
+    },
+    {
+      "group": "Integrations",
+      "pages": [ "api-reference/integrations/verify" ]
+    },
+    {
+      "group": "Webhooks",
+      "pages": [ "api-reference/webhooks/stripe" ]
+    },
+    {
+      "group": "Usage",
+      "pages": [ "api-reference/usage/burn", "api-reference/usage/wallet" ]
+    },
+    {
+      "group": "Vouchers",
+      "pages": [ "api-reference/vouchers/create" ]
+    },
+    {
+      "group": "Partner API",
+      "pages": [
+        "api-reference/partners/me",
+        "api-reference/partners/reports",
+        "api-reference/partners/invoices",
+        "api-reference/partners/budgets"
+      ]
     }
-  ]
+  ],
+  "footerSocials": {
+    "github": "https://github.com/partner-funded-credits"
+  },
+  "api": {
+    "baseUrl": "https://vnvraupjpmhzzjhxxrhn.supabase.co/functions/v1/api",
+    "auth": { "method": "bearer" }
+  },
+  "openapi": "openapi/openapi.yaml"
 }
