@@ -50,6 +50,7 @@
     {
       "group": "Get Started",
       "pages": [
+        "",
         "overview",
         "quickstart/platform",
         "quickstart/partner"
