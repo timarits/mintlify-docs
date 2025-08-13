@@ -1,0 +1,224 @@
+---
+title: "Authentication"
+description: "Authentication methods and security model"
+---
+
+Partner-Funded Credits uses multiple authentication methods depending on the operation type.
+
+## Authentication Methods
+
+### Bearer Token (User Operations)
+
+Used for user-scoped operations like creating projects, burning credits, and checking wallets.
+
+```bash
+curl -H "Authorization: Bearer your-anon-key" \
+  https://your-project.supabase.co/functions/v1/api/v1/projects
+```
+
+<ResponseField name="Token Type" type="string">
+  Supabase anon key or user JWT token
+</ResponseField>
+
+<ResponseField name="Scope" type="string">
+  User's own projects via Row-Level Security (RLS)
+</ResponseField>
+
+<ResponseField name="Operations" type="array">
+  - Create/view projects
+  - Verify integrations  
+  - Burn credits
+  - Check wallet balance
+  - Create vouchers
+</ResponseField>
+
+### Partner Key (Partner Operations)
+
+Used for partner billing operations like viewing reports and managing budgets.
+
+```bash
+curl -H "X-Partner-Key: pk_your-partner-key" \
+  https://your-project.supabase.co/functions/v1/api/v1/partners/me
+```
+
+<ResponseField name="Format" type="string">
+  `pk_` + 48 random characters
+</ResponseField>
+
+<ResponseField name="Scope" type="string">
+  Partner's own billing data and reports
+</ResponseField>
+
+<ResponseField name="Operations" type="array">
+  - View partner profile
+  - Get usage reports
+  - Download invoices
+  - Check budget status
+</ResponseField>
+
+### Service Role (Admin Operations)
+
+Used for system administration like billing reconciliation and budget management.
+
+```bash
+curl -H "Authorization: Bearer your-service-role-key" \
+  https://your-project.supabase.co/functions/v1/api/v1/billing/reconcile
+```
+
+<ResponseField name="Token Type" type="string">
+  Supabase service role key
+</ResponseField>
+
+<ResponseField name="Scope" type="string">
+  Full system access, bypasses RLS
+</ResponseField>
+
+<ResponseField name="Operations" type="array">
+  - Billing reconciliation
+  - Set partner budgets
+  - Create partner API keys
+  - Manual credit grants
+</ResponseField>
+
+## Security Model
+
+### Row-Level Security (RLS)
+
+All user data is protected by PostgreSQL RLS policies:
+
+```sql
+-- Users can only see their own projects
+CREATE POLICY "proj_sel" ON projects 
+FOR SELECT USING (owner_id = auth.uid());
+
+-- Users can only see wallets for their projects  
+CREATE POLICY "wal_sel" ON credit_wallets 
+FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM projects p 
+    WHERE p.id = credit_wallets.project_id 
+    AND p.owner_id = auth.uid()
+  )
+);
+```
+
+### API Key Management
+
+Partner API keys are:
+- Generated once via admin API
+- Stored as SHA-256 hashes
+- Cannot be recovered, only revoked
+- Scoped to specific partner data
+
+<CodeGroup>
+```bash Generate Key (Admin)
+curl -H "Authorization: Bearer $SERVICE_ROLE" \
+  -d '{"partner":"stripe"}' \
+  "$API/v1/partners/stripe/keys"
+```
+
+```bash Use Key (Partner)
+curl -H "X-Partner-Key: pk_abc123..." \
+  "$API/v1/partners/reports/summary"
+```
+</CodeGroup>
+
+### Voucher Authentication
+
+Sponsored burn vouchers use JWT tokens signed with `VOUCHER_SECRET`:
+
+```bash
+# Create voucher
+curl -H "Authorization: Bearer $ANON" \
+  -d '{"project_id":"proj_123","partner":"stripe","phase":"integration_setup"}' \
+  "$API/v1/vouchers"
+
+# Use voucher  
+curl -H "Authorization: Bearer $ANON" \
+  -H "X-PF-Voucher: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..." \
+  -d '{"project_id":"proj_123","units":50}' \
+  "$API/v1/usage/burn"
+```
+
+## Common Authentication Errors
+
+### 401 Unauthorized
+
+```json
+{
+  "error": "unauthorized",
+  "details": "Missing or invalid Authorization header"
+}
+```
+
+**Cause**: No `Authorization` header or invalid token  
+**Fix**: Include valid bearer token or partner key
+
+### 403 Forbidden  
+
+```json
+{
+  "error": "project_not_found", 
+  "details": "Project access denied"
+}
+```
+
+**Cause**: RLS policy blocking access  
+**Fix**: Ensure project belongs to authenticated user
+
+### 403 Voucher Required
+
+```json
+{
+  "error": "voucher_required",
+  "details": "Setup phase requires sponsored voucher"
+}
+```
+
+**Cause**: Setup burn without voucher when `VOUCHER_REQUIRED_FOR_SETUP=true`  
+**Fix**: Create and include voucher in `X-PF-Voucher` header
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Token Security" icon="shield">
+    **Never expose service role keys in frontend code**
+    
+    **Rotate partner keys regularly**
+    
+    **Use environment variables for sensitive keys**
+    
+    **Implement proper token validation**
+  </Card>
+  
+  <Card title="Error Handling" icon="triangle-exclamation">
+    **Handle 401/403 errors gracefully**
+    
+    **Implement retry logic with exponential backoff**
+    
+    **Log authentication failures for monitoring**
+    
+    **Provide clear error messages to users**
+  </Card>
+</CardGroup>
+
+## Testing Authentication
+
+Use the debug endpoint to test your authentication:
+
+<CodeGroup>
+```bash Test User Auth
+curl -H "Authorization: Bearer $ANON" \
+  https://your-project.supabase.co/functions/v1/api/__debug
+```
+
+```bash Test Partner Auth  
+curl -H "X-Partner-Key: $PARTNER_KEY" \
+  https://your-project.supabase.co/functions/v1/api/v1/partners/me
+```
+
+```bash Test Admin Auth
+curl -H "Authorization: Bearer $SERVICE_ROLE" \
+  https://your-project.supabase.co/functions/v1/api/__debug
+```
+</CodeGroup>

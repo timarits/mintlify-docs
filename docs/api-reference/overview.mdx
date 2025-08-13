@@ -1,0 +1,196 @@
+---
+title: "API Overview"
+description: "Complete API reference for Partner-Funded Credits"
+---
+
+## Base URL
+
+All API endpoints are relative to your Supabase project:
+
+```
+https://your-project.supabase.co/functions/v1/api
+```
+
+## Authentication
+
+<CodeGroup>
+```bash Bearer Token
+curl -H "Authorization: Bearer your-anon-key" \
+  https://your-project.supabase.co/functions/v1/api/v1/projects
+```
+
+```bash Partner Key
+curl -H "X-Partner-Key: pk_your-partner-key" \
+  https://your-project.supabase.co/functions/v1/api/v1/partners/me
+```
+
+```bash Service Role (Admin)
+curl -H "Authorization: Bearer your-service-role-key" \
+  https://your-project.supabase.co/functions/v1/api/v1/billing/reconcile
+```
+</CodeGroup>
+
+### Authentication Methods
+
+<CardGroup cols={3}>
+  <Card title="Bearer Token" icon="key">
+    **For**: User operations (projects, burns, wallets)
+    
+    **Header**: `Authorization: Bearer <anon-key>`
+    
+    **Scope**: User's own projects via RLS
+  </Card>
+  
+  <Card title="Partner Key" icon="handshake">
+    **For**: Partner operations (reports, budgets)
+    
+    **Header**: `X-Partner-Key: pk_<partner-key>`
+    
+    **Scope**: Partner's own billing data
+  </Card>
+  
+  <Card title="Service Role" icon="shield">
+    **For**: Admin operations (billing, budgets)
+    
+    **Header**: `Authorization: Bearer <service-role-key>`
+    
+    **Scope**: Full system access
+  </Card>
+</CardGroup>
+
+## Headers
+
+### Required Headers
+
+All requests should include these headers:
+
+```bash
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+### Optional Headers
+
+<ResponseField name="Idempotency-Key" type="string">
+  Unique key to ensure safe retries. Format: `operation-identifier-timestamp`
+</ResponseField>
+
+<ResponseField name="X-PF-Voucher" type="string">
+  JWT voucher for sponsored burns during setup flows
+</ResponseField>
+
+<ResponseField name="X-Partner-Key" type="string">
+  Partner API key for billing operations
+</ResponseField>
+
+<ResponseField name="X-Demo-Admin" type="string">
+  Demo admin flag for testing admin endpoints
+</ResponseField>
+
+## Response Format
+
+### Success Response
+
+```json
+{
+  "project_id": "550e8400-e29b-41d4-a716-446655440000",
+  "balance": 1000,
+  "tx_id": "tx_abc123"
+}
+```
+
+### Error Response
+
+```json
+{
+  "error": "insufficient_credits",
+  "details": {
+    "balance": 45,
+    "required": 100
+  }
+}
+```
+
+### Common Error Codes
+
+<ResponseField name="unauthorized" type="401">
+  Missing or invalid Authorization header
+</ResponseField>
+
+<ResponseField name="insufficient_credits" type="400">
+  Not enough credits in wallet for operation
+</ResponseField>
+
+<ResponseField name="project_not_found" type="404">
+  Project doesn't exist or access denied via RLS
+</ResponseField>
+
+<ResponseField name="voucher_required" type="403">
+  Setup phase requires sponsored voucher
+</ResponseField>
+
+<ResponseField name="voucher_not_configured" type="500">
+  VOUCHER_SECRET not set in edge function
+</ResponseField>
+
+## Rate Limits
+
+<Info>
+Rate limits are enforced at the Supabase Edge Function level. Typical limits:
+- **User operations**: 100 requests/minute per user
+- **Partner operations**: 1000 requests/minute per partner
+- **Admin operations**: No limit (service role)
+</Info>
+
+## CORS
+
+All endpoints support CORS with these headers:
+
+```
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: GET,POST,OPTIONS  
+Access-Control-Allow-Headers: Authorization, Content-Type, apikey, x-client-info, Idempotency-Key, X-PF-Voucher, X-Partner-Key, X-Demo-Admin
+```
+
+## Idempotency
+
+All mutation operations (POST requests) support idempotency via the `Idempotency-Key` header:
+
+<CodeGroup>
+```bash Create Project
+curl -H "Authorization: Bearer $ANON" \
+  -H "Idempotency-Key: create-project-1" \
+  -d '{"name":"My Project"}' \
+  "$API/v1/projects"
+```
+
+```bash Burn Credits  
+curl -H "Authorization: Bearer $ANON" \
+  -H "Idempotency-Key: burn-user123-1" \
+  -d '{"project_id":"proj_123","units":50}' \
+  "$API/v1/usage/burn"
+```
+</CodeGroup>
+
+<Warning>
+Idempotency keys should be unique per operation and user. Reusing the same key returns the original response without performing the operation again.
+</Warning>
+
+## SDK
+
+For TypeScript/JavaScript applications, use the official SDK:
+
+```bash
+npm install @partner-funded-credits/sdk
+```
+
+```typescript
+import { createApiClient } from '@partner-funded-credits/sdk';
+
+const client = createApiClient({
+  baseUrl: 'https://your-project.supabase.co/functions/v1/api',
+  apiKey: 'your-anon-key'
+});
+
+const project = await client.createProject({ name: 'My Project' });
+```

@@ -1,0 +1,210 @@
+---
+title: "Changelog"
+description: "Track updates and improvements to Partner-Funded Credits"
+---
+
+## v1.0.0 (2025-08-13)
+
+<Card title="🎉 Initial Release" icon="party-popper">
+  **Core Features**
+  - ✅ Project and wallet management
+  - ✅ Integration verification with base grants
+  - ✅ Event-gated bonus credits via webhooks  
+  - ✅ Sponsored setup burns with vouchers
+  - ✅ Partner API for reporting and budgets
+  - ✅ Admin API for budget and rate management
+</Card>
+
+### API Endpoints
+
+<AccordionGroup>
+  <Accordion title="User API">
+    - `POST /v1/projects` - Create projects
+    - `POST /v1/integrations/{partner}/verify` - Verify integrations
+    - `POST /webhooks/{partner}` - Partner event webhooks
+    - `POST /v1/usage/burn` - Burn credits with optional voucher
+    - `GET /v1/wallet` - Get wallet balance
+    - `POST /v1/vouchers` - Create sponsored vouchers
+  </Accordion>
+  
+  <Accordion title="Partner API">
+    - `GET /v1/partners/me` - Partner profile
+    - `GET /v1/partners/reports/summary` - Usage reports
+    - `GET /v1/partners/invoices` - Invoice management
+    - `GET /v1/partners/budgets` - Budget monitoring
+  </Accordion>
+  
+  <Accordion title="Admin API">
+    - `POST /v1/billing/reconcile` - Monthly reconciliation
+    - `POST /v1/partners/{slug}/budgets` - Budget management
+    - `POST /v1/partners/{slug}/rate` - Rate card configuration
+    - `POST /v1/partners/{slug}/keys` - API key management
+  </Accordion>
+</AccordionGroup>
+
+### SDK Features
+
+<CardGroup cols={2}>
+  <Card title="TypeScript SDK" icon="code">
+    - Full type safety with Zod validation
+    - Idempotency key handling
+    - Comprehensive error handling
+    - Promise-based async operations
+  </Card>
+  
+  <Card title="Developer Experience" icon="sparkles">
+    - Complete API documentation
+    - Interactive test console
+    - Partner and admin dashboards
+    - Comprehensive troubleshooting guides
+  </Card>
+</CardGroup>
+
+### Security
+
+<AccordionGroup>
+  <Accordion title="Authentication & Authorization">
+    - Row-level security (RLS) on all tables
+    - JWT voucher verification with HS256 signing
+    - Partner API key authentication with SHA-256 hashing
+    - Service role protection for admin operations
+  </Accordion>
+  
+  <Accordion title="Fraud Prevention">
+    - Budget enforcement with real-time checking
+    - Fraud signal generation for anomalies
+    - Rate limiting and abuse detection
+    - Complete audit trails for all transactions
+  </Accordion>
+</AccordionGroup>
+
+### Infrastructure
+
+<CardGroup cols={2}>
+  <Card title="Backend" icon="server">
+    - Supabase Edge Functions for serverless API
+    - PostgreSQL with advanced RLS policies
+    - Automated billing reconciliation system
+    - CSV/PDF invoice generation
+  </Card>
+  
+  <Card title="Frontend" icon="window">
+    - React-based test and admin consoles
+    - Real-time balance tracking
+    - Interactive API documentation
+    - Comprehensive error handling
+  </Card>
+</CardGroup>
+
+---
+
+## Roadmap
+
+### v1.1.0 (Planned - Q1 2025)
+
+<CardGroup cols={2}>
+  <Card title="Enhanced Features" icon="rocket">
+    - Multi-partner voucher support
+    - Enhanced fraud detection algorithms
+    - Webhook replay functionality
+    - Advanced analytics dashboard
+  </Card>
+  
+  <Card title="Developer Experience" icon="code">
+    - GraphQL API support
+    - Real-time balance updates via WebSockets
+    - Custom rule templates
+    - Enhanced SDK error handling
+  </Card>
+</CardGroup>
+
+### v1.2.0 (Planned - Q2 2025)
+
+<CardGroup cols={2}>
+  <Card title="Platform Expansion" icon="globe">
+    - Mobile SDK (React Native)
+    - Additional partner integrations
+    - Multi-currency support
+    - Advanced reporting features
+  </Card>
+  
+  <Card title="Enterprise Features" icon="building">
+    - Team management and permissions
+    - Custom billing cycles
+    - Advanced rule conditions
+    - Dedicated support channels
+  </Card>
+</CardGroup>
+
+### v2.0.0 (Planned - Q3 2025)
+
+<CardGroup cols={2}>
+  <Card title="Architecture Enhancements" icon="gear">
+    - Microservices architecture
+    - Multi-region deployment
+    - Advanced caching layer
+    - Performance optimizations
+  </Card>
+  
+  <Card title="New Capabilities" icon="star">
+    - AI-powered fraud detection
+    - Predictive budgeting
+    - Dynamic pricing models
+    - Advanced integrations marketplace
+  </Card>
+</CardGroup>
+
+---
+
+## Migration Guides
+
+### Upgrading from v0.x to v1.0
+
+<Warning>
+This is a major version release with breaking changes. Please review the migration guide carefully.
+</Warning>
+
+<AccordionGroup>
+  <Accordion title="API Changes">
+    - Endpoint paths now include `/v1/` prefix
+    - Authentication headers standardized
+    - Error response format updated
+    - Idempotency key requirements added
+  </Accordion>
+  
+  <Accordion title="Database Schema">
+    - New tables for enhanced billing
+    - Updated RLS policies for better security
+    - Additional indexes for performance
+    - Voucher system implementation
+  </Accordion>
+  
+  <Accordion title="SDK Updates">
+    - New TypeScript definitions
+    - Updated error handling
+    - Additional helper methods
+    - Improved documentation
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Support & Feedback
+
+<CardGroup cols={3}>
+  <Card title="Documentation" icon="book" href="/overview">
+    Complete guides and API reference
+  </Card>
+  
+  <Card title="GitHub Issues" icon="github">
+    Report bugs and request features
+  </Card>
+  
+  <Card title="Discussions" icon="messages">
+    Community support and feedback
+  </Card>
+</CardGroup>
+
+<Info>
+Stay updated with the latest changes by watching our GitHub repository and joining our community discussions.
+</Info>

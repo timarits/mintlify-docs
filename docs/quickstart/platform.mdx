@@ -1,0 +1,289 @@
+---
+title: "Platform Quickstart"
+description: "Get your platform integrated with Partner-Funded Credits in minutes"
+---
+
+Get your platform integrated with Partner-Funded Credits in minutes. This guide shows you how to create projects, verify integrations, and manage credits from your user's perspective.
+
+## Prerequisites
+
+- Node.js 18+ installed
+- A Supabase project (for production)
+- Your platform's authentication system
+
+## Environment Setup
+
+First, set up your environment variables:
+
+```bash
+# Required - Point to your Supabase instance
+export PROJECT="https://vnvraupjpmhzzjhxxrhn.supabase.co"
+export API="$PROJECT/functions/v1/api/v1"
+
+# Your Supabase anon key  
+export ANON="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+# For testing
+export PROJECT_ID=""  # Will be populated after creating project
+```
+
+## Installation
+
+Install the SDK in your application:
+
+```bash
+npm install @partner-funded-credits/sdk
+```
+
+Or use direct HTTP calls with your preferred client.
+
+## Quick Start Flow
+
+### 1. Create a Project
+
+Every user needs a project with an associated wallet:
+
+<CodeGroup>
+```typescript SDK
+import { createApiClient } from '@partner-funded-credits/sdk';
+
+const client = createApiClient({
+  baseUrl: 'https://vnvraupjpmhzzjhxxrhn.supabase.co/functions/v1/api',
+  apiKey: 'your-anon-key',
+});
+
+const project = await client.createProject({ 
+  name: 'My Integration Project' 
+});
+
+console.log(project);
+// { project_id: 'proj_123', wallet_id: 'wallet_456', balance: 0 }
+```
+
+```bash cURL
+curl -sS -H "Authorization: Bearer $ANON" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: create-$(date +%s)" \
+  -d '{"name":"My Integration Project"}' \
+  "$API/projects"
+```
+
+```javascript JavaScript
+const createProject = async (name) => {
+  const response = await fetch(`${API}/projects`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${ANON}`,
+      'Content-Type': 'application/json',
+      'Idempotency-Key': `create-${Date.now()}`
+    },
+    body: JSON.stringify({ name })
+  });
+  
+  return response.json();
+};
+
+const project = await createProject('My Integration Project');
+```
+</CodeGroup>
+
+<ResponseExample>
+```json Response
+{
+  "project_id": "550e8400-e29b-41d4-a716-446655440000",
+  "wallet_id": "550e8400-e29b-41d4-a716-446655440001", 
+  "balance": 0
+}
+```
+</ResponseExample>
+
+### 2. Verify Integration (Base Grant)
+
+When users connect their Stripe account, they receive base credits:
+
+<CodeGroup>
+```typescript SDK
+const verification = await client.verifyIntegration({
+  projectId: project.project_id,
+  partner: 'stripe',
+  mode: 'test',
+  accountId: 'acct_test_123',
+  idempotencyKey: 'verify-stripe-1'
+});
+
+console.log(verification);
+// { verified: true, grant: { amount: 1000 }, balance: 1000 }
+```
+
+```bash cURL
+PROJECT_ID="550e8400-e29b-41d4-a716-446655440000"
+
+curl -sS -H "Authorization: Bearer $ANON" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: verify-stripe-1" \
+  -d "{\"project_id\":\"$PROJECT_ID\",\"mode\":\"test\",\"account_id\":\"acct_test_123\"}" \
+  "$API/integrations/stripe/verify"
+```
+
+```javascript JavaScript
+const verifyIntegration = async (projectId, accountId) => {
+  const response = await fetch(`${API}/integrations/stripe/verify`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${ANON}`,
+      'Content-Type': 'application/json',
+      'Idempotency-Key': 'verify-stripe-1'
+    },
+    body: JSON.stringify({
+      project_id: projectId,
+      mode: 'test',
+      account_id: accountId
+    })
+  });
+  
+  return response.json();
+};
+```
+</CodeGroup>
+
+<ResponseExample>
+```json Response
+{
+  "verified": true,
+  "external_account_id": "acct_test_123",
+  "grant": { "amount": 1000 },
+  "balance": 1000
+}
+```
+</ResponseExample>
+
+### 3. Sponsored Setup Burns
+
+During setup flows, use vouchers to sponsor user costs:
+
+<CodeGroup>
+```typescript SDK
+// Create a voucher for setup sponsorship
+const voucher = await client.createVoucher({
+  project_id: project.project_id,
+  partner: 'stripe',
+  phase: 'integration_setup',
+  cap: 300,
+  ttl_sec: 900, // 15 minutes
+  workflow_id: 'workflow_123'
+});
+
+// Use the voucher for a sponsored burn
+const burn = await client.burn({
+  projectId: project.project_id,
+  units: 50,
+  context: { 
+    phase: 'integration_setup',
+    workflow_id: 'workflow_123' 
+  },
+  voucher: voucher.voucher,
+  idempotencyKey: 'setup-burn-1'
+});
+
+console.log(burn);
+// { balance: 1000, matched: 50, tx_id: 'tx_789' }
+// Note: balance unchanged (1000), matched=50 covers the cost
+```
+
+```bash cURL
+# Create voucher
+VOUCHER=$(curl -sS -H "Authorization: Bearer $ANON" \
+  -H "Content-Type: application/json" \
+  -d "{\"project_id\":\"$PROJECT_ID\",\"partner\":\"stripe\",\"phase\":\"integration_setup\",\"cap\":300,\"ttl_sec\":900}" \
+  "$API/vouchers" | jq -r .voucher)
+
+# Use voucher for sponsored burn
+curl -sS -H "Authorization: Bearer $ANON" \
+  -H "Content-Type: application/json" \
+  -H "X-PF-Voucher: $VOUCHER" \
+  -H "Idempotency-Key: setup-burn-1" \
+  -d "{\"project_id\":\"$PROJECT_ID\",\"units\":50,\"context\":{\"phase\":\"integration_setup\"}}" \
+  "$API/usage/burn"
+```
+</CodeGroup>
+
+## Integration Patterns
+
+### React Hook Example
+
+```typescript
+import { useState, useEffect } from 'react';
+import { createApiClient } from '@partner-funded-credits/sdk';
+
+const useCredits = (projectId: string) => {
+  const [balance, setBalance] = useState(0);
+  const [loading, setLoading] = useState(false);
+  
+  const client = createApiClient({
+    baseUrl: process.env.REACT_APP_PFC_API_URL,
+    apiKey: process.env.REACT_APP_SUPABASE_ANON_KEY,
+  });
+
+  const burn = async (units: number, context?: any) => {
+    setLoading(true);
+    try {
+      const result = await client.burn({
+        projectId,
+        units,
+        context,
+        idempotencyKey: `burn-${Date.now()}`
+      });
+      setBalance(result.balance);
+      return result;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const refreshBalance = async () => {
+    const wallet = await client.getWallet({ projectId });
+    setBalance(wallet.balance);
+  };
+
+  useEffect(() => {
+    refreshBalance();
+  }, [projectId]);
+
+  return { balance, burn, refreshBalance, loading };
+};
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Event-Gated Bonuses" href="/guides/event-gated-bonus">
+    Set up production webhooks for bonus credits
+  </Card>
+  <Card title="Rules Engine" href="/guides/rules-engine">
+    Configure custom sponsorship logic
+  </Card>
+  <Card title="Security Model" href="/guides/security-model">
+    Production deployment considerations
+  </Card>
+  <Card title="Troubleshooting" href="/troubleshooting">
+    Common issues and solutions
+  </Card>
+</CardGroup>
+
+## Production Checklist
+
+<AccordionGroup>
+  <Accordion title="Setup Tasks">
+    - [ ] Configure production Supabase project
+    - [ ] Set up proper authentication flow
+    - [ ] Configure partner webhooks for bonus events
+    - [ ] Implement proper error handling
+  </Accordion>
+  
+  <Accordion title="Testing & Monitoring">
+    - [ ] Set up monitoring and logging
+    - [ ] Test idempotency key handling
+    - [ ] Configure rate limiting
+    - [ ] Set up backup and recovery procedures
+  </Accordion>
+</AccordionGroup>

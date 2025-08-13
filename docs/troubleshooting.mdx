@@ -1,0 +1,327 @@
+---
+title: "Troubleshooting"
+description: "Common issues and solutions for Partner-Funded Credits integration"
+---
+
+Common issues and solutions for Partner-Funded Credits integration.
+
+## API Errors
+
+### 401 Unauthorized
+
+```json
+{ "error": "unauthorized" }
+```
+
+<AccordionGroup>
+  <Accordion title="Cause & Solution">
+    **Cause**: Missing or invalid Authorization header  
+    **Fix**: Include `Authorization: Bearer <anon-key>` header
+    
+    ```bash
+    curl -H "Authorization: Bearer your-anon-key" \
+      https://your-project.supabase.co/functions/v1/api/v1/projects
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### 403 Insufficient Credits
+
+```json
+{ 
+  "error": "insufficient_credits", 
+  "balance": 45, 
+  "required": 100 
+}
+```
+
+<AccordionGroup>
+  <Accordion title="Cause & Solution">
+    **Cause**: Not enough credits in wallet  
+    **Fix**: Verify integration or use sponsored voucher
+    
+    ```bash
+    # Check current balance
+    curl -H "Authorization: Bearer $ANON" \
+      "$API/v1/wallet?project_id=$PROJECT_ID"
+    
+    # Verify integration for base grant
+    curl -H "Authorization: Bearer $ANON" \
+      -d '{"project_id":"proj_123","partner":"stripe"}' \
+      "$API/v1/integrations/stripe/verify"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### 404 Not Found
+
+```
+Not Found
+```
+
+<AccordionGroup>
+  <Accordion title="Cause & Solution">
+    **Cause**: Wrong function name or path  
+    **Fix**: Use correct API base: `https://PROJECT.supabase.co/functions/v1/api`
+    
+    ```bash
+    # ✅ Correct
+    https://vnvraupjpmhzzjhxxrhn.supabase.co/functions/v1/api/v1/projects
+    
+    # ❌ Wrong
+    https://vnvraupjpmhzzjhxxrhn.supabase.co/api/v1/projects
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### 400 Voucher Required
+
+```json
+{ "error": "voucher_required" }
+```
+
+<AccordionGroup>
+  <Accordion title="Cause & Solution">
+    **Cause**: Setup phase requires sponsored voucher  
+    **Fix**: Create voucher first: `POST /v1/vouchers`
+    
+    ```bash
+    # Create voucher
+    VOUCHER=$(curl -H "Authorization: Bearer $ANON" \
+      -d '{"project_id":"proj_123","partner":"stripe","phase":"integration_setup"}' \
+      "$API/v1/vouchers" | jq -r .voucher)
+    
+    # Use voucher
+    curl -H "X-PF-Voucher: $VOUCHER" \
+      -d '{"project_id":"proj_123","units":50}' \
+      "$API/v1/usage/burn"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## CORS Issues
+
+### "Failed to fetch"
+
+<AccordionGroup>
+  <Accordion title="Cause & Solution">
+    **Cause**: CORS headers missing  
+    **Fix**: Ensure OPTIONS requests return 204 with proper headers
+    
+    Test CORS:
+    ```bash
+    curl -i -X OPTIONS \
+      -H "Access-Control-Request-Method: POST" \
+      -H "Access-Control-Request-Headers: Authorization" \
+      https://your-project.supabase.co/functions/v1/api/v1/projects
+    ```
+    
+    Should return:
+    ```
+    Access-Control-Allow-Origin: *
+    Access-Control-Allow-Methods: GET,POST,OPTIONS
+    Access-Control-Allow-Headers: Authorization, Content-Type, Idempotency-Key, X-PF-Voucher
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### "Access-Control-Allow-Headers"
+
+<AccordionGroup>
+  <Accordion title="Cause & Solution">
+    **Cause**: Missing required headers in CORS config  
+    **Fix**: Include `X-PF-Voucher`, `Idempotency-Key` in allowed headers
+    
+    Required CORS headers:
+    ```
+    Access-Control-Allow-Headers: Authorization, Content-Type, apikey, x-client-info, Idempotency-Key, X-PF-Voucher, X-Partner-Key, X-Demo-Admin
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Integration Issues
+
+### "Project not found"
+
+<AccordionGroup>
+  <Accordion title="Cause & Solution">
+    **Cause**: RLS policy blocking access  
+    **Fix**: Ensure project created with same auth user
+    
+    ```bash
+    # Create project with consistent auth
+    curl -H "Authorization: Bearer $ANON" \
+      -d '{"name":"Test Project"}' \
+      "$API/v1/projects"
+    
+    # Use same token for subsequent operations
+    curl -H "Authorization: Bearer $ANON" \
+      "$API/v1/wallet?project_id=$PROJECT_ID"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Idempotency Not Working
+
+<AccordionGroup>
+  <Accordion title="Cause & Solution">
+    **Cause**: Missing or changing Idempotency-Key  
+    **Fix**: Use consistent key format: `operation-identifier-timestamp`
+    
+    ```bash
+    # ✅ Good pattern
+    curl -H "Idempotency-Key: verify-stripe-${PROJECT_ID}-$(date +%s)" \
+      # ... rest of request
+    
+    # ❌ Bad - too generic
+    curl -H "Idempotency-Key: test" \
+      # ... rest of request
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Sponsored Burns Not Working
+
+### Setup Burns Still Charge User
+
+<AccordionGroup>
+  <Accordion title="Cause & Solution">
+    **Cause**: Voucher not being applied properly
+    
+    **Check list**:
+    1. `X-PF-Voucher` header included
+    2. `context.phase: 'integration_setup'` in request body
+    3. `workflow_id` matches voucher (if specified)
+    4. `VOUCHER_SECRET` configured in edge function
+    
+    ```bash
+    # Verify voucher creation
+    curl -H "Authorization: Bearer $ANON" \
+      -d '{"project_id":"proj_123","partner":"stripe","phase":"integration_setup","cap":300,"ttl_sec":900}' \
+      "$API/v1/vouchers"
+    
+    # Use voucher correctly
+    curl -H "Authorization: Bearer $ANON" \
+      -H "X-PF-Voucher: $VOUCHER_JWT" \
+      -d '{"project_id":"proj_123","units":50,"context":{"phase":"integration_setup"}}' \
+      "$API/v1/usage/burn"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Quick Diagnostic Commands
+
+### Health Check
+
+```bash
+curl -i https://your-project.supabase.co/functions/v1/api/__debug
+```
+
+Should return JSON with `ok: true`.
+
+### Test CORS
+
+```bash
+curl -i -X OPTIONS \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: Authorization" \
+  https://your-project.supabase.co/functions/v1/api/v1/projects
+```
+
+Should return 204 with CORS headers.
+
+### Test Authentication
+
+```bash
+# Test user auth
+curl -H "Authorization: Bearer $ANON" \
+  https://your-project.supabase.co/functions/v1/api/__debug
+
+# Test partner auth  
+curl -H "X-Partner-Key: $PARTNER_KEY" \
+  https://your-project.supabase.co/functions/v1/api/v1/partners/me
+```
+
+### Check Edge Function Logs
+
+```bash
+supabase functions logs api --tail
+```
+
+Look for error patterns and request traces.
+
+## Common Integration Patterns
+
+### Safe Retry Pattern
+
+```typescript
+const retryWithBackoff = async (fn: () => Promise<any>, maxRetries = 3) => {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (i === maxRetries - 1) throw error;
+      
+      // Exponential backoff
+      await new Promise(resolve => 
+        setTimeout(resolve, Math.pow(2, i) * 1000)
+      );
+    }
+  }
+};
+
+// Usage
+const project = await retryWithBackoff(() => 
+  client.createProject({ name: 'My Project' })
+);
+```
+
+### Error Handling
+
+```typescript
+try {
+  const result = await client.burn({
+    projectId: 'proj_123',
+    units: 100,
+    idempotencyKey: 'burn-123'
+  });
+} catch (error) {
+  if (error.message.includes('insufficient_credits')) {
+    // Handle insufficient credits
+    console.log('Balance too low:', error.details?.balance);
+    
+    // Redirect to pricing or show upgrade prompt
+    showUpgradePrompt();
+  } else if (error.message.includes('project_not_found')) {
+    // Handle access denied
+    console.log('Project access denied');
+    
+    // Redirect to login or project selection
+    redirectToAuth();
+  } else {
+    // Handle other errors
+    console.error('Unexpected error:', error);
+    showErrorMessage('Something went wrong. Please try again.');
+  }
+}
+```
+
+## Getting Help
+
+<CardGroup cols={3}>
+  <Card title="API Reference" icon="book" href="/api-reference/overview">
+    Complete endpoint documentation with examples
+  </Card>
+  
+  <Card title="Test Console" icon="terminal" href="/test">
+    Interactive testing environment
+  </Card>
+  
+  <Card title="GitHub Issues" icon="github">
+    Report bugs and request features
+  </Card>
+</CardGroup>
+
+<Info>
+If you're still experiencing issues after trying these solutions, please check the [API Reference](/api-reference/overview) for detailed endpoint documentation or test your setup using the [Test Console](/test).
+</Info>

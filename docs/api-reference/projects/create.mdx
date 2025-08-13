@@ -1,0 +1,139 @@
+---
+title: "Create Project"
+api: "POST /v1/projects"
+description: "Create a new project with associated wallet"
+---
+
+Creates a new project and associated credit wallet for the authenticated user.
+
+<ParamField body="name" type="string" required>
+  Project name for identification
+</ParamField>
+
+<RequestExample>
+```bash cURL
+curl -X POST https://your-project.supabase.co/functions/v1/api/v1/projects \
+  -H "Authorization: Bearer your-anon-key" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: create-project-123" \
+  -d '{
+    "name": "My Integration Project"
+  }'
+```
+
+```typescript SDK
+import { createApiClient } from '@partner-funded-credits/sdk';
+
+const client = createApiClient({
+  baseUrl: 'https://your-project.supabase.co/functions/v1/api',
+  apiKey: 'your-anon-key'
+});
+
+const project = await client.createProject({
+  name: 'My Integration Project'
+});
+```
+
+```javascript JavaScript
+const response = await fetch('https://your-project.supabase.co/functions/v1/api/v1/projects', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer your-anon-key',
+    'Content-Type': 'application/json',
+    'Idempotency-Key': 'create-project-123'
+  },
+  body: JSON.stringify({
+    name: 'My Integration Project'
+  })
+});
+
+const project = await response.json();
+```
+</RequestExample>
+
+<ResponseExample>
+```json Success Response
+{
+  "project_id": "550e8400-e29b-41d4-a716-446655440000",
+  "wallet_id": "550e8400-e29b-41d4-a716-446655440001",
+  "balance": 0
+}
+```
+
+```json Error Response
+{
+  "error": "unauthorized",
+  "details": "Missing or invalid Authorization header"
+}
+```
+</ResponseExample>
+
+## Response Fields
+
+<ResponseField name="project_id" type="string">
+  Unique identifier for the created project
+</ResponseField>
+
+<ResponseField name="wallet_id" type="string">
+  Unique identifier for the associated credit wallet
+</ResponseField>
+
+<ResponseField name="balance" type="number">
+  Initial credit balance (always 0 for new projects)
+</ResponseField>
+
+## Error Responses
+
+<ResponseField name="401 Unauthorized" type="object">
+  Missing or invalid `Authorization` header
+  
+  ```json
+  {
+    "error": "unauthorized",
+    "details": "Missing or invalid Authorization header"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="400 Bad Request" type="object">
+  Invalid request body or missing required fields
+  
+  ```json
+  {
+    "error": "validation_error", 
+    "details": {
+      "name": "Project name is required"
+    }
+  }
+  ```
+</ResponseField>
+
+## Notes
+
+<Info>
+Projects are automatically associated with the authenticated user via Row-Level Security (RLS). Users can only access their own projects.
+</Info>
+
+<Warning>
+Project names should be unique per user for better organization, though this is not enforced at the database level.
+</Warning>
+
+## Idempotency
+
+This endpoint supports idempotency. Include an `Idempotency-Key` header to safely retry requests:
+
+```bash
+curl -H "Idempotency-Key: create-project-$(date +%s)" \
+  # ... rest of request
+```
+
+Using the same idempotency key will return the original project without creating a duplicate.
+
+## Next Steps
+
+After creating a project:
+
+1. [Verify an integration](/api-reference/integrations/verify) to receive base credits
+2. [Create vouchers](/api-reference/vouchers/create) for sponsored setup flows  
+3. [Burn credits](/api-reference/usage/burn) for actual usage
+4. [Check wallet balance](/api-reference/usage/wallet) to monitor credits
