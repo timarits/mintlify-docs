@@ -1,14 +1,7 @@
 {
   "name": "Partner-Funded Credits",
-  "logo": { "dark": "/logo/dark.svg", "light": "/logo/light.svg" },
-  "favicon": "/favicon.svg",
-  "colors": {
-    "primary": "#2e8555",
-    "light": "#49cc90",
-    "dark": "#2e8555",
-    "anchors": { "from": "#2e8555", "to": "#49cc90" }
-  },
   "navigation": [
     { "group": "Get Started", "pages": [ "/" ] }
-  ]
+  ],
+  "openapi": "openapi.yaml"
 }
