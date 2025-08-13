@@ -1,0 +1,443 @@
+openapi: 3.0.3
+info:
+  title: Partner-Funded Credits API
+  description: |
+    A comprehensive credit system that enables platforms to offer sponsored integrations,
+    where partners like Stripe fund user setup costs through a flexible rules engine.
+  version: 1.0.0
+  contact:
+    name: Partner-Funded Credits Support
+    url: https://partner-funded-credits.vercel.app/docs
+servers:
+  - url: https://vnvraupjpmhzzjhxxrhn.supabase.co/functions/v1/api
+    description: Production API
+  - url: http://localhost:54321/functions/v1/api
+    description: Local Development
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    partnerKey:
+      type: apiKey
+      in: header
+      name: X-Partner-Key
+    demoAdmin:
+      type: apiKey
+      in: header
+      name: X-Demo-Admin
+
+  schemas:
+    Project:
+      type: object
+      properties:
+        project_id:
+          type: string
+          format: uuid
+        wallet_id:
+          type: string
+          format: uuid
+        balance:
+          type: integer
+          minimum: 0
+    
+    VerifyIntegrationResponse:
+      type: object
+      properties:
+        verified:
+          type: boolean
+        external_account_id:
+          type: string
+        grant:
+          type: object
+          properties:
+            amount:
+              type: integer
+        balance:
+          type: integer
+
+    BurnResponse:
+      type: object
+      properties:
+        balance:
+          type: integer
+        tx_id:
+          type: string
+          format: uuid
+        matched:
+          type: integer
+          description: Amount matched by sponsor (if voucher used)
+
+    WalletResponse:
+      type: object
+      properties:
+        balance:
+          type: integer
+        sponsor_breakdown:
+          type: array
+          items:
+            type: object
+
+    VoucherResponse:
+      type: object
+      properties:
+        voucher:
+          type: string
+          description: JWT token for sponsored burns
+        exp:
+          type: string
+          format: date-time
+        remaining:
+          type: integer
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        details:
+          type: object
+
+paths:
+  /__debug:
+    get:
+      summary: Debug endpoint
+      description: Returns system status and configuration for debugging
+      tags: [System]
+      responses:
+        '200':
+          description: Debug information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /v1/projects:
+    post:
+      summary: Create project
+      description: Creates a new project with associated wallet
+      tags: [Projects]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "My Integration Project"
+      responses:
+        '200':
+          description: Project created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+              example:
+                project_id: "550e8400-e29b-41d4-a716-446655440000"
+                wallet_id: "550e8400-e29b-41d4-a716-446655440001"
+                balance: 0
+
+  /v1/integrations/{partner}/verify:
+    post:
+      summary: Verify integration
+      description: Verifies a partner integration and grants base credits
+      tags: [Integrations]
+      parameters:
+        - name: partner
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [stripe]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                project_id:
+                  type: string
+                  format: uuid
+                mode:
+                  type: string
+                  enum: [test, live]
+                account_id:
+                  type: string
+                oauth_code:
+                  type: string
+              required: [project_id, mode]
+      responses:
+        '200':
+          description: Integration verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyIntegrationResponse'
+              example:
+                verified: true
+                external_account_id: "acct_1234567890"
+                grant:
+                  amount: 1000
+                balance: 1000
+
+  /webhooks/{partner}:
+    post:
+      summary: Partner webhook
+      description: Receives partner events and grants bonus credits on first live charge
+      tags: [Webhooks]
+      parameters:
+        - name: partner
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [stripe]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  example: "checkout.session.completed"
+                account_id:
+                  type: string
+                project_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  bonus_grant:
+                    type: integer
+
+  /v1/usage/burn:
+    post:
+      summary: Burn credits
+      description: Burns credits for usage, with optional voucher matching
+      tags: [Usage]
+      parameters:
+        - name: X-PF-Voucher
+          in: header
+          required: false
+          schema:
+            type: string
+          description: JWT voucher for sponsored burns
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                project_id:
+                  type: string
+                  format: uuid
+                units:
+                  type: integer
+                  minimum: 1
+                context:
+                  type: object
+                  properties:
+                    phase:
+                      type: string
+                    workflow_id:
+                      type: string
+                      format: uuid
+              required: [project_id, units]
+      responses:
+        '200':
+          description: Credits burned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BurnResponse'
+
+  /v1/wallet:
+    get:
+      summary: Get wallet balance
+      description: Retrieves current wallet balance and breakdown
+      tags: [Wallet]
+      parameters:
+        - name: project_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Wallet information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletResponse'
+
+  /v1/vouchers:
+    post:
+      summary: Create voucher
+      description: Creates a sponsored burn voucher for setup flows
+      tags: [Vouchers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                project_id:
+                  type: string
+                  format: uuid
+                partner:
+                  type: string
+                phase:
+                  type: string
+                cap:
+                  type: integer
+                ttl_sec:
+                  type: integer
+                workflow_id:
+                  type: string
+                  format: uuid
+              required: [project_id, partner, phase, cap, ttl_sec]
+      responses:
+        '200':
+          description: Voucher created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoucherResponse'
+
+  /v1/partners/me:
+    get:
+      summary: Get partner info
+      description: Returns partner account information
+      tags: [Partner API]
+      security:
+        - partnerKey: []
+      responses:
+        '200':
+          description: Partner information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  partner:
+                    type: string
+                  name:
+                    type: string
+
+  /v1/partners/reports/summary:
+    get:
+      summary: Get partner summary
+      description: Returns usage summary for the specified period  
+      tags: [Partner API]
+      security:
+        - partnerKey: []
+      parameters:
+        - name: period
+          in: query
+          required: true
+          schema:
+            type: string
+            example: "2025-08"
+      responses:
+        '200':
+          description: Partner summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  period:
+                    type: string
+                  credits_granted:
+                    type: integer
+                  projects_count:
+                    type: integer
+
+  /v1/partners/invoices:
+    get:
+      summary: Get partner invoices
+      description: Returns invoices for the specified period
+      tags: [Partner API] 
+      security:
+        - partnerKey: []
+      parameters:
+        - name: period
+          in: query
+          required: true
+          schema:
+            type: string
+            example: "2025-08"
+      responses:
+        '200':
+          description: Partner invoices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    period:
+                      type: string
+                    amount_cents:
+                      type: integer
+                    status:
+                      type: string
+
+  /v1/partners/budgets:
+    get:
+      summary: Get partner budgets
+      description: Returns budget information for the specified period
+      tags: [Partner API]
+      security:
+        - partnerKey: []
+      parameters:
+        - name: period
+          in: query
+          required: true
+          schema:
+            type: string
+            example: "2025-08"
+      responses:
+        '200':
+          description: Partner budget
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  period:
+                    type: string
+                  credit_cap:
+                    type: integer
+                  spend_cap_cents:
+                    type: integer
